@@ -1,0 +1,8 @@
+{
+  "name": "ship-site",
+  "description": "Publish a site to Cloudflare Pages and check it live.",
+  "owner": { "name": "skyeyesec333" },
+  "plugins": [
+    { "name": "ship-site", "source": "./", "description": "Skill: ship-site. Commit, push, build, deploy to Cloudflare Pages with wrangler, verify the live site; clean redeploys for secrets; R2 for big media.", "category": "development", "tags": ["cloudflare", "pages", "wrangler", "deploy"] }
+  ]
+}
