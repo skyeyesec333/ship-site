@@ -21,6 +21,8 @@ A working starting point. It applies to static files only; a Pages Function sets
 
 - **Start the Content-Security-Policy as `-Report-Only`.** It logs what it would block and blocks nothing. Walk through the whole site on a preview deployment with the console open, add what is legitimately needed (Cloudflare Web Analytics adds `static.cloudflareinsights.com` to scripts and `cloudflareinsights.com` to connect; Turnstile needs `https://challenges.cloudflare.com` in script and frame; WebAssembly needs `'wasm-unsafe-eval'`; workers from blobs need `worker-src blob:`; media from another domain needs `media-src`), then rename the header to `Content-Security-Policy`.
 - Leave `upgrade-insecure-requests` out while report-only (browsers ignore it there and warn on every load); add it when enforcing.
+- **`Cross-Origin-Opener-Policy: same-origin` breaks popups that must talk back to the page:** sign in with Google/GitHub (OAuth popups), payment windows (PayPal, Stripe Checkout in a popup), some embeds. If the site opens any, use `same-origin-allow-popups` instead.
+- **`includeSubDomains` in `Strict-Transport-Security` applies to every subdomain of the zone** for the whole `max-age`, including ones served elsewhere over plain http (an old blog, a device on `*.example.com`). Leave it out until every subdomain serves https; never add `preload` without being sure, as it is very slow to undo.
 - **Do not add `Cross-Origin-Embedder-Policy`** if the site uses Turnstile or other third-party frames: it blocks them.
 - Only `/assets/*` (content-hashed names) gets a long cache. Files in `public/` keep their names when their contents change; a year's cache would serve an old file to new code.
 

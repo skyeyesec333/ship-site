@@ -15,6 +15,8 @@ A release flow refined over dozens of releases of a production site: a large thr
 5. check     scripts/check-live.mjs against every live address
 ```
 
+`scripts/` means the `scripts/` folder **in this skill's own directory** (installed as a plugin: `${CLAUDE_PLUGIN_ROOT}/skills/ship-site/scripts/`), not the user's project. Run the scripts by that full path from the project root.
+
 Do every step every time, and report what the live check printed. "Deployed" without step 5 is not shipped.
 
 ## Config
@@ -37,7 +39,11 @@ Read `ship.config.json` at the project root if it exists; otherwise ask once and
 
 - `git status --short` and `git diff --stat`. A dirty tree is normal: other work may be half done. **Ship only the change that is ready.** Stage those paths by name (never `git add -A` on a tree with unrelated edits), and say what you left out.
 - `wrangler pages deploy` uploads the built folder, **not** a commit. If unrelated edits are in the working tree, the build contains them. When they must not go out, build from a clean copy of the commit: `scripts/clean-redeploy.sh <commit>` (step 4b).
-- Never commit secrets: `.env`, `.dev.vars`, `.wrangler/` belong in `.gitignore`. Grep the staged diff for keys (`sk_`, `re_`, `-----BEGIN`, `api_key`) before committing.
+- Never commit secrets: `.env`, `.dev.vars`, `.wrangler/` belong in `.gitignore`. Grep the staged diff for keys before committing:
+  ```sh
+  git diff --cached | grep -nE 'AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|github_pat_|gh[ousr]_[A-Za-z0-9]{20,}|xox[abprs]-|sk-[A-Za-z0-9_-]{20,}|sk_(live|test)_|re_[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY|api[_-]?key|secret|password'
+  ```
+  Any hit is read by eye before going on; a dedicated scanner (`gitleaks git .`) is better when installed.
 
 ## 2. Commit and push
 
@@ -50,9 +56,10 @@ Read `ship.config.json` at the project root if it exists; otherwise ask once and
 Run the build command. Then:
 
 ```sh
-scripts/check-sizes.sh dist        # any file over 25 MiB? Pages refuses them
+scripts/check-sizes.sh dist        # Pages' limits: file size, file count, _headers rules (PAGES_PLAN=paid for paid plans)
 ```
 
+- **Pages' limits** ([current list](https://developers.cloudflare.com/pages/platform/limits/)): a single file at most **25 MiB**; at most **20,000 files** per site on the Free plan, 100,000 on paid plans; a `_headers` file at most **100 rules**, `_redirects` 2,000 static and 100 dynamic. Check the page if a number matters: limits change.
 - **Pages refuses any single file over 25 MiB.** Big media (video, large models) go on **R2 behind a custom domain** (see [references/r2-media.md](references/r2-media.md)).
 - **Cloudflare does not compress `application/octet-stream`.** Binary formats it does not know (`.vrm`, `.bin`, custom extensions) are served at full size. Gzip them at build time and inflate in the browser with `DecompressionStream`, keeping the plain file beside it as a fallback.
 - Comments in shipped JS/CSS: the minifier removes them, but **text inside template strings (GLSL shaders, HTML snippets) is left alone**. If source comments hold notes not meant for visitors, strip block comments from template strings in a build-only plugin and check the output with `grep -c '/\*' dist/assets/*.js`. See [references/hardening.md](references/hardening.md).
@@ -70,18 +77,18 @@ Use the global `wrangler` the user is signed in with (`wrangler whoami`). Keep t
 For a redeploy where nothing in the code should change (a secret was added, a rollback, a dirty tree):
 
 ```sh
-scripts/clean-redeploy.sh <commit> --project <project> --branch <branch> [--build "npm run build"] [--out dist] [--dry-run]
+scripts/clean-redeploy.sh <commit> --project <project> --branch <production-branch> [--build "npm run build"] [--out dist] [--dry-run]
 ```
 
-It `git archive`s that commit into a scratch folder, links the project's `node_modules`, builds there and deploys that build. Only what is in the commit can ship. `--dry-run` stops before the deploy.
+The project, branch, build and output folder default to `ship.config.json`; without a branch from either, it refuses rather than guess (a wrong branch makes the deploy a preview). It `git archive`s that commit into a scratch folder, links the project's `node_modules`, builds there and deploys that build. Only what is in the commit can ship. `--dry-run` stops before the deploy. It refuses repos with submodules or Git LFS files (git archive leaves them out) and warns about untracked `.env` files the build will not see.
 
 ## 5. Check it live
 
 ```sh
-node scripts/check-live.mjs --dist <out> <url> [<url> ...]
+node scripts/check-live.mjs --dist <out> <url> [<url> ...]      # --timeout 15 (seconds) by default
 ```
 
-For each address it reports the status, the security headers present and missing, whether the page references the **asset names of the build you just made** (so you know the new version is the one being served and not a cache), and the status of every script, stylesheet and preload the page names (any 4xx/5xx fails). Exit code 1 on any failure. Report its output.
+For each address it reports the status, the security headers present and missing, whether the page references **every hashed asset the new build's `index.html` names** (so you know the new version is the one being served and not a cache), and the status of every script, stylesheet and preload the page names on the site's own origin (any 4xx/5xx fails; a redirect to http fails, one to another host is reported and not followed). Exit code 1 on any failure. Report its output.
 
 If it shows the old assets: wait a few seconds and run it again (the custom domain can lag the `pages.dev` address briefly); if it persists, check that the deploy went to the production branch, not a preview.
 
@@ -96,9 +103,9 @@ If it shows the old assets: wait a few seconds and run it again (the custom doma
 Tail it while sending one request:
 
 ```sh
-wrangler pages deployment tail <deployment-url> --project-name <project> --format json
+wrangler pages deployment tail --project-name <project> --environment production --format json
 ```
 
-It needs the deployment's address (from step 4 or `wrangler pages deployment list --project-name <project>`). Read the status code and the function's own log lines. Common causes: a secret not set or set before the last deploy, the origin not on the function's allowlist (add every `pages.dev` address Cloudflare gave the project, including any with a suffix, e.g. `my-site-abc.pages.dev`), a bot check (Turnstile) whose widget does not list that hostname.
+With no deployment given it tails the latest production deployment (`--environment preview` for the latest preview); to tail an older one, pass its ID or URL (from step 4 or `wrangler pages deployment list --project-name <project>`) before the flags. `--status error` shows only failures. Read the status code and the function's own log lines. Common causes: a secret not set or set before the last deploy, the origin not on the function's allowlist (add every `pages.dev` address Cloudflare gave the project, including any with a suffix, e.g. `my-site-abc.pages.dev`), a bot check (Turnstile) whose widget does not list that hostname.
 
 More hard-won rules (headers, CSP, origins, caching): [references/hardening.md](references/hardening.md).

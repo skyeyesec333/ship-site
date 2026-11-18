@@ -1,11 +1,21 @@
 {
   "name": "ship-site",
   "displayName": "Ship Site",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Publish a static site or Vite app to Cloudflare Pages safely: ship only what is meant, commit, push, build, deploy with wrangler, then check the live addresses.",
-  "author": { "name": "skyeyesec333" },
+  "author": {
+    "name": "skyeyesec333"
+  },
   "license": "MIT",
   "repository": "https://github.com/skyeyesec333/ship-site",
   "homepage": "https://github.com/skyeyesec333/ship-site",
-  "keywords": ["cloudflare", "pages", "wrangler", "deploy", "vite", "static-site", "r2"]
+  "keywords": [
+    "cloudflare",
+    "pages",
+    "wrangler",
+    "deploy",
+    "vite",
+    "static-site",
+    "r2"
+  ]
 }
