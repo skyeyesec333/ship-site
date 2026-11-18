@@ -15,7 +15,7 @@ A release flow refined over dozens of releases of a production site: a large thr
 5. check     scripts/check-live.mjs against every live address
 ```
 
-`scripts/` means the `scripts/` folder **in this skill's own directory** (installed as a plugin: `${CLAUDE_PLUGIN_ROOT}/skills/ship-site/scripts/`), not the user's project. Run the scripts by that full path from the project root.
+`scripts/` means the `scripts/` folder **in this skill's own directory** (`${CLAUDE_SKILL_DIR}/scripts/`, for a plugin or a copied skill alike), not the user's project. Run the scripts by that full path from the project root.
 
 Do every step every time, and report what the live check printed. "Deployed" without step 5 is not shipped.
 
