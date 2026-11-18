@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Check that live addresses serve the site you just built.
 //
-//   node check-live.mjs [--dist dist] [--strict-headers] <url> [<url> ...]
+//   node check-live.mjs [--dist dist] [--strict-headers] [--all-origins] <url> [<url> ...]
 //
 // For each address: HTTP status, security headers present / missing, whether the page references the asset
 // file names in the local build folder (proving the new build is the one served), and the status of every
@@ -12,12 +12,14 @@ import { readdirSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const args = process.argv.slice(2);
-let dist = null, strictHeaders = false;
+let dist = null, strictHeaders = false, allOrigins = false;
+const MAX_ASSETS = 200;
 const urls = [];
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--dist") dist = args[++i];
   else if (args[i] === "--strict-headers") strictHeaders = true;
-  else if (args[i] === "-h" || args[i] === "--help") { console.log("usage: check-live.mjs [--dist dist] [--strict-headers] <url> ..."); process.exit(0); }
+  else if (args[i] === "--all-origins") allOrigins = true;
+  else if (args[i] === "-h" || args[i] === "--help") { console.log("usage: check-live.mjs [--dist dist] [--strict-headers] [--all-origins] <url> ..."); process.exit(0); }
   else urls.push(args[i]);
 }
 if (!urls.length) { console.error("give at least one URL"); process.exit(2); }
@@ -85,7 +87,14 @@ for (const url of urls) {
     else console.log(`  ok   serves this build (${seen.length} of its hashed files named in the page, e.g. ${seen[0]})`);
   }
 
-  const refs = refsIn(html, r.url || url);
+  // Only fetch what the page references on its own origin (http/https), unless --all-origins: the page's
+  // HTML decides what gets requested, so a third-party or tampered page must not steer this script elsewhere.
+  const origin = new URL(r.url || url).origin;
+  const all = refsIn(html, r.url || url).filter((u) => /^https?:$/.test(new URL(u).protocol));
+  const others = all.filter((u) => new URL(u).origin !== origin);
+  let refs = allOrigins ? all : all.filter((u) => new URL(u).origin === origin);
+  if (!allOrigins && others.length) console.log(`  info ${others.length} asset(s) on other origins not fetched (pass --all-origins to check them)`);
+  if (refs.length > MAX_ASSETS) { console.log(`  warn ${refs.length} assets referenced; checking the first ${MAX_ASSETS}`); refs = refs.slice(0, MAX_ASSETS); }
   let bad = 0;
   await Promise.all(refs.map(async (ref) => {
     let a = await get(ref, "HEAD");
