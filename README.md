@@ -14,7 +14,7 @@ It came out of dozens of releases of a production three.js site with a contact-f
 2. **Commits and pushes** with your GitHub noreply address and a plain message about what visitors will see.
 3. **Builds and checks sizes** (`scripts/check-sizes.sh`): files Pages will refuse, and binary files Cloudflare will send uncompressed.
 4. **Deploys** with `wrangler pages deploy`, or rebuilds **exactly one commit from a clean copy** (`scripts/clean-redeploy.sh`) when a secret changed or the working tree holds unfinished work.
-5. **Checks the live site** (`scripts/check-live.mjs`): status, security headers, that the page names the asset files of the build you just made, and that every script and stylesheet loads.
+5. **Checks the live site** (`scripts/check-live.mjs`): status, security headers, that the page names the asset files of the build you just made, and that every script and stylesheet on the site's own origin loads (`--all-origins` checks third-party ones too).
 
 It also guides secrets (`wrangler pages secret put`), tailing a failing Pages Function, big media on R2 with a custom domain, security headers and a CSP rollout.
 
