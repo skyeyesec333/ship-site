@@ -21,12 +21,13 @@ cfg() { [[ -f "$ROOT/ship.config.json" ]] && node -e 'const c=require(process.ar
 PROJECT="$(cfg project)" BRANCH="$(cfg branch)" BUILD="$(cfg build)" OUT="$(cfg out)" SCRATCH="" DRY=0
 BUILD="${BUILD:-npm run build}" OUT="${OUT:-dist}"
 BRANCH_FROM="ship.config.json"; [[ -n "$BRANCH" ]] || BRANCH_FROM=""
+BUILD_FROM=""; [[ -n "$(cfg build)" ]] && BUILD_FROM="ship.config.json"
 need() { [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || { echo "$1 needs a value"; exit 2; }; }
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --project) need "$@"; PROJECT="$2"; shift 2;;
     --branch) need "$@"; BRANCH="$2"; BRANCH_FROM="--branch"; shift 2;;
-    --build) need "$@"; BUILD="$2"; shift 2;;
+    --build) need "$@"; BUILD="$2"; BUILD_FROM="--build"; shift 2;;
     --out) need "$@"; OUT="$2"; shift 2;;
     --scratch) need "$@"; SCRATCH="$2"; shift 2;;
     --dry-run) DRY=1; shift;;
@@ -34,6 +35,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -n "$PROJECT" || $DRY -eq 1 ]] || { echo "--project is required (or set \"project\" in ship.config.json, or use --dry-run)"; exit 2; }
+# Values may come from ship.config.json in the repo: check their shape before they reach wrangler or a path.
+[[ -z "$PROJECT" || "$PROJECT" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]] || { echo "project name '$PROJECT' is not a Pages project name (a-z, 0-9, -)"; exit 2; }
+[[ -z "$BRANCH" ]] || git check-ref-format --branch "$BRANCH" >/dev/null 2>&1 || { echo "branch '$BRANCH' is not a valid branch name"; exit 2; }
+[[ "$OUT" != /* && "$OUT" != *..* && "$OUT" =~ ^[A-Za-z0-9._/-]+$ ]] || { echo "output folder '$OUT' must be a plain relative path inside the repo"; exit 2; }
 if [[ -z "$BRANCH" ]]; then
   [[ $DRY -eq 1 ]] || { echo "--branch is required: the branch Pages treats as production (or set \"branch\" in ship.config.json). A wrong one deploys a preview."; exit 2; }
   BRANCH="<production-branch>"
@@ -75,7 +80,9 @@ if [[ -d "$ROOT/node_modules" && ! -e "$SCRATCH/node_modules" ]]; then
 fi
 # Files outside Git that the build may need (gitignored large assets) are NOT copied: say so if the build fails.
 
-echo "build    $BUILD"
+# The build command runs as written, like an npm script: ship.config.json is part of the project and trusted
+# the same way package.json is. It is printed first, so the deploy log shows exactly what ran.
+echo "build    $BUILD${BUILD_FROM:+ (from $BUILD_FROM)}"
 ( cd "$SCRATCH" && eval "$BUILD" )
 [[ -d "$SCRATCH/$OUT" ]] || { echo "build produced no $OUT/"; exit 1; }
 echo "built    $(du -sh "$SCRATCH/$OUT" | cut -f1) in $SCRATCH/$OUT"

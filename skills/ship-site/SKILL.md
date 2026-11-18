@@ -80,7 +80,7 @@ For a redeploy where nothing in the code should change (a secret was added, a ro
 scripts/clean-redeploy.sh <commit> --project <project> --branch <production-branch> [--build "npm run build"] [--out dist] [--dry-run]
 ```
 
-The project, branch, build and output folder default to `ship.config.json`; without a branch from either, it refuses rather than guess (a wrong branch makes the deploy a preview). It `git archive`s that commit into a scratch folder, links the project's `node_modules`, builds there and deploys that build. Only what is in the commit can ship. `--dry-run` stops before the deploy. It refuses repos with submodules or Git LFS files (git archive leaves them out) and warns about untracked `.env` files the build will not see.
+The project, branch, build and output folder default to `ship.config.json`; without a branch from either, it refuses rather than guess (a wrong branch makes the deploy a preview). It `git archive`s that commit into a scratch folder, links the project's `node_modules`, builds there and deploys that build. Only what is in the commit can ship. `--dry-run` stops before the deploy. It refuses repos with submodules or Git LFS files (git archive leaves them out) and warns about untracked `.env` files the build will not see. The project name, branch and output folder are checked before use; the `build` command runs as written, like an npm script, so treat `ship.config.json` as part of the project's code and read it before running a repo you didn't write.
 
 ## 5. Check it live
 
