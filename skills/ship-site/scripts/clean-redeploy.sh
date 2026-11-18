@@ -38,7 +38,7 @@ done
 # Values may come from ship.config.json in the repo: check their shape before they reach wrangler or a path.
 [[ -z "$PROJECT" || "$PROJECT" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]] || { echo "project name '$PROJECT' is not a Pages project name (a-z, 0-9, -)"; exit 2; }
 [[ -z "$BRANCH" ]] || git check-ref-format --branch "$BRANCH" >/dev/null 2>&1 || { echo "branch '$BRANCH' is not a valid branch name"; exit 2; }
-[[ "$OUT" != /* && "$OUT" != *..* && "$OUT" =~ ^[A-Za-z0-9._/-]+$ ]] || { echo "output folder '$OUT' must be a plain relative path inside the repo"; exit 2; }
+[[ "$OUT" != /* && "$OUT" != *..* && "$OUT" =~ ^[A-Za-z0-9._][A-Za-z0-9._/-]*$ ]] || { echo "output folder '$OUT' must be a plain relative path inside the repo"; exit 2; }
 if [[ -z "$BRANCH" ]]; then
   [[ $DRY -eq 1 ]] || { echo "--branch is required: the branch Pages treats as production (or set \"branch\" in ship.config.json). A wrong one deploys a preview."; exit 2; }
   BRANCH="<production-branch>"
@@ -94,6 +94,6 @@ if [[ $DRY -eq 1 ]]; then
 fi
 
 # Deploy from the scratch copy; wrangler reads the project's wrangler.toml there (it came with the commit).
-( cd "$SCRATCH" && wrangler pages deploy "$OUT" --project-name "$PROJECT" --branch "$BRANCH" \
+( cd "$SCRATCH" && wrangler pages deploy "./$OUT" --project-name "$PROJECT" --branch "$BRANCH" \
     --commit-hash "$SHA" --commit-message "Redeploy of $SHORT" --commit-dirty=false )
 echo "done. Scratch copy kept at $SCRATCH (remove it yourself when no longer needed)."
